@@ -1,0 +1,151 @@
+.function-list {
+    max-width: 1400px;
+}
+
+.function-tree-container {
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.tree-header {
+    display: grid;
+    grid-template-columns: 1fr 250px;
+    gap: 16px;
+    padding: 16px 24px;
+    background-color: var(--bg-color);
+    border-bottom: 2px solid var(--border-color);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.tree-body {
+    padding: 8px 0;
+}
+
+.tree-node {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.tree-node:last-child {
+    border-bottom: none;
+}
+
+.tree-node-content {
+    display: flex;
+    grid-template-columns: 1fr 250px;
+    gap: 16px;
+    padding: 12px 24px;
+    align-items: center;
+    transition: background-color 0.2s;
+}
+
+.tree-node-content:hover {
+    background-color: var(--bg-color);
+}
+
+.tree-toggle {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    transition: color 0.2s;
+    flex-shrink: 0;
+}
+
+.tree-toggle:hover:not(:disabled) {
+    color: var(--text-primary);
+}
+
+.tree-toggle:disabled {
+    cursor: default;
+    opacity: 0.3;
+}
+
+.tree-spacer {
+    display: block;
+    width: 16px;
+    height: 16px;
+}
+
+.tree-node-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.tree-node-id {
+    padding: 4px 8px;
+    background-color: #f1f5f9;
+    color: #475569;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: monospace;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.tree-node-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tree-node-count {
+    font-size: 13px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.tree-node-permissions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.permission-badge {
+    padding: 4px 10px;
+    background-color: #dbeafe;
+    color: #2563eb;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.tree-children {
+    background-color: rgba(0, 0, 0, 0.01);
+}
+
+@media (max-width: 768px) {
+
+    .tree-header,
+    .tree-node-content {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .tree-node-content {
+        padding: 16px;
+    }
+
+    .tree-node-permissions {
+        justify-content: flex-start;
+    }
+}
