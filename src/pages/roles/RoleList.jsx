@@ -88,17 +88,25 @@ export default function RoleList() {
         }
     };
 
-    // Count functions in tree
-    const countFunctions = (functions) => {
+    // Count leaf functions (chỉ đếm chức năng lá)
+    const countLeafFunctions = (functions) => {
         if (!functions || functions.length === 0) return 0;
-        let count = functions.length;
+
+        let count = 0;
+
         functions.forEach((func) => {
-            if (func.children && func.children.length > 0) {
-                count += countFunctions(func.children);
+            if (!func.children || func.children.length === 0) {
+                // là chức năng lá
+                count += 1;
+            } else {
+                // có con → duyệt tiếp
+                count += countLeafFunctions(func.children);
             }
         });
+
         return count;
     };
+
 
     // Filter roles
     const filteredRoles = roles.filter((role) =>
@@ -150,11 +158,11 @@ export default function RoleList() {
                             <div className="role-stat">
                                 <span className="role-stat-label">Chức năng:</span>
                                 <span className="role-stat-value">
-                                    {countFunctions(role.functions)} chức năng
+                                    {countLeafFunctions(role.functions)} chức năng
                                 </span>
                             </div>
 
-                            {role.functions && role.functions.length > 0 && (
+                            {/* {role.functions && role.functions.length > 0 && (
                                 <div className="role-functions">
                                     <p className="role-functions-title">Chức năng chính:</p>
                                     <div className="function-badges">
@@ -170,7 +178,7 @@ export default function RoleList() {
                                         )}
                                     </div>
                                 </div>
-                            )}
+                            )} */}
                         </div>
 
                         <div className="role-card-footer">

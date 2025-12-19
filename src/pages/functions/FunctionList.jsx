@@ -39,7 +39,7 @@ function TreeNode({ node, level = 0 }) {
                 </div>
 
                 <div className="tree-node-permissions">
-                    {node.show_search && <span className="permission-badge">Tìm</span>}
+                    {node.show_search && <span className="permission-badge">Xem</span>}
                     {node.show_add && <span className="permission-badge">Thêm</span>}
                     {node.show_update && <span className="permission-badge">Sửa</span>}
                     {node.show_delete && <span className="permission-badge">Xóa</span>}

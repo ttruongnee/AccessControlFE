@@ -21,21 +21,28 @@ export default function Dashboard() {
         queryFn: functionApi.getAll,
     });
 
-    // ✅ THÊM: Hàm đếm tất cả functions trong tree (đệ quy)
-    const countFunctions = (nodes) => {
-        if (!nodes || nodes.length === 0) return 0;
+    // Count leaf functions (chỉ đếm chức năng lá)
+    const countLeafFunctions = (functions) => {
+        if (!functions || functions.length === 0) return 0;
 
-        let count = nodes.length;
-        nodes.forEach((node) => {
-            if (node.children && node.children.length > 0) {
-                count += countFunctions(node.children);
+        let count = 0;
+
+        functions.forEach((func) => {
+            if (!func.children || func.children.length === 0) {
+                // là chức năng lá
+                count += 1;
+            } else {
+                // có con → duyệt tiếp
+                count += countLeafFunctions(func.children);
             }
         });
+
         return count;
     };
 
+
     // ✅ SỬA: Đếm tổng functions từ tree
-    const totalFunctions = countFunctions(functions);
+    const totalFunctions = countLeafFunctions(functions);
 
     const stats = [
         {
@@ -136,7 +143,7 @@ export default function Dashboard() {
                                     <div className="role-details">
                                         <p className="role-name">{role.name}</p>
                                         <p className="role-functions">
-                                            {countFunctions(role.functions)} chức năng
+                                            {countLeafFunctions(role.functions)} chức năng
                                         </p>
                                     </div>
                                 </div>

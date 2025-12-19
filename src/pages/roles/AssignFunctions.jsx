@@ -53,7 +53,7 @@ function FunctionTreeNode({ node, selectedIds, onToggle, level = 0 }) {
                 </div>
 
                 <div className="tree-permissions">
-                    {node.show_search && <span className="perm-badge">Tìm</span>}
+                    {node.show_search && <span className="perm-badge">Xem</span>}
                     {node.show_add && <span className="perm-badge">Thêm</span>}
                     {node.show_update && <span className="perm-badge">Sửa</span>}
                     {node.show_delete && <span className="perm-badge">Xóa</span>}
