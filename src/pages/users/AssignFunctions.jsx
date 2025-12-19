@@ -1,24 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { userApi } from '../../api/users';
 import { functionApi } from '../../api/functions';
-import { ArrowLeft, Save, FileCode, ChevronRight, ChevronDown, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Save, FileCode, ChevronRight, ChevronDown, AlertCircle, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import './AssignFunctions.css';
 
-// ✅ Component Tree Node với validation
+// Component Tree Node với validation
 function FunctionTreeNode({
     node,
     selectedIds,
     onToggle,
-    roleFunctionIds,  // ✅ THÊM: IDs from roles
+    roleFunctionIds,
     level = 0
 }) {
     const [isExpanded, setIsExpanded] = useState(true);
     const hasChildren = node.children && node.children.length > 0;
     const isSelected = selectedIds.includes(node.id);
-    const isFromRole = roleFunctionIds.includes(node.id); // ✅ Check if from role
+    const isFromRole = roleFunctionIds.includes(node.id);
 
     return (
         <div className="tree-node">
@@ -46,9 +46,9 @@ function FunctionTreeNode({
                 <div className="tree-checkbox">
                     <input
                         type="checkbox"
-                        checked={isSelected || isFromRole} // ✅ Auto check if from role
-                        onChange={() => !isFromRole && onToggle(node.id, node.parent_id)} // ✅ Disable if from role
-                        disabled={isFromRole} // ✅ Disable checkbox
+                        checked={isSelected || isFromRole}
+                        onChange={() => !isFromRole && onToggle(node.id, node.parent_id)}
+                        disabled={isFromRole}
                     />
                 </div>
 
@@ -58,7 +58,6 @@ function FunctionTreeNode({
                     {hasChildren && (
                         <span className="tree-count">({node.children.length})</span>
                     )}
-                    {/* ✅ THÊM: Badge hiển thị "Từ vai trò" */}
                     {isFromRole && (
                         <span className="from-role-badge">
                             <AlertCircle size={12} />
@@ -83,7 +82,7 @@ function FunctionTreeNode({
                             node={child}
                             selectedIds={selectedIds}
                             onToggle={onToggle}
-                            roleFunctionIds={roleFunctionIds} // ✅ Pass down
+                            roleFunctionIds={roleFunctionIds}
                             level={level + 1}
                         />
                     ))}
@@ -96,9 +95,10 @@ function FunctionTreeNode({
 export default function AssignFunctions() {
     const { userId } = useParams();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [selectedFunctions, setSelectedFunctions] = useState([]);
     const [functionMap, setFunctionMap] = useState({});
-    const [roleFunctionIds, setRoleFunctionIds] = useState([]); // ✅ THÊM: IDs from roles
+    const [roleFunctionIds, setRoleFunctionIds] = useState([]);
 
     // Get user info
     const { data: user, isLoading: userLoading } = useQuery({
@@ -119,14 +119,14 @@ export default function AssignFunctions() {
         enabled: !!userId,
     });
 
-    // ✅ THÊM: Get user roles with functions
+    // Get user roles with functions
     const { data: userRoles = [] } = useQuery({
         queryKey: ['user-roles', userId],
         queryFn: () => userApi.getRoles(parseInt(userId)),
         enabled: !!userId,
     });
 
-    // ✅ THÊM: Extract function IDs from roles
+    // Extract function IDs from roles
     useEffect(() => {
         if (userRoles.length > 0) {
             const ids = new Set();
@@ -238,11 +238,26 @@ export default function AssignFunctions() {
         mutationFn: (functionIds) =>
             userApi.updateFunctions(parseInt(userId), functionIds),
         onSuccess: () => {
+            queryClient.invalidateQueries(['user-functions', userId]);
             toast.success('Cập nhật chức năng thành công');
             navigate('/users');
         },
         onError: (error) => {
             toast.error(error.response?.data?.message || 'Cập nhật chức năng thất bại');
+        },
+    });
+
+    // Delete all functions mutation
+    const deleteAllMutation = useMutation({
+        mutationFn: () => userApi.deleteFunctions(parseInt(userId)),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['user-functions', userId]);
+            setSelectedFunctions([]);
+            toast.success('Xóa toàn bộ chức năng riêng thành công');
+            // navigate('/users');
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.message || 'Xóa chức năng thất bại');
         },
     });
 
@@ -252,17 +267,13 @@ export default function AssignFunctions() {
             const isCurrentlySelected = prev.includes(functionId);
 
             if (isCurrentlySelected) {
-                // UNCHECK: Remove function + all its children
                 const childrenIds = getAllChildrenIds(functionId, allFunctions);
                 return prev.filter(
                     (id) => id !== functionId && !childrenIds.includes(id)
                 );
             } else {
-                // CHECK: Add function + all its parents
                 const parentIds = getAllParentIds(functionId);
                 const newIds = [functionId, ...parentIds];
-
-                // Remove duplicates
                 const uniqueIds = [...new Set([...prev, ...newIds])];
                 return uniqueIds;
             }
@@ -277,7 +288,6 @@ export default function AssignFunctions() {
             return;
         }
 
-        // ✅ Frontend validation: Check for duplicates with role functions
         const duplicates = selectedFunctions.filter(id => roleFunctionIds.includes(id));
         if (duplicates.length > 0) {
             toast.error(`Các chức năng sau đã có trong vai trò: ${duplicates.join(', ')}`);
@@ -287,7 +297,19 @@ export default function AssignFunctions() {
         updateMutation.mutate(selectedFunctions);
     };
 
-    // Count total functions
+    // Handle delete all with confirmation
+    const handleDeleteAll = () => {
+        if (selectedFunctions.length === 0) {
+            toast.error('Người dùng chưa có chức năng riêng nào');
+            return;
+        }
+
+        if (window.confirm(
+            `Bạn có chắc muốn xóa TOÀN BỘ chức năng riêng của người dùng "${user?.username}"?`)) {
+            deleteAllMutation.mutate();
+        }
+    };
+
     const totalFunctions = Object.keys(functionMap).length;
 
     if (userLoading || functionsLoading) {
@@ -312,7 +334,6 @@ export default function AssignFunctions() {
                     <p className="help-text">
                         * Chọn chức năng con sẽ tự động chọn chức năng cha
                     </p>
-                    {/* ✅ THÊM: Warning message */}
                     {roleFunctionIds.length > 0 && (
                         <p className="help-text warning">
                             <AlertCircle size={14} />
@@ -329,16 +350,27 @@ export default function AssignFunctions() {
                             <FileCode size={20} />
                             <span>Chọn chức năng cho người dùng</span>
                         </div>
-                        <div className="header-counts">
-                            <span className="selected-count">
-                                Đã chọn: {selectedFunctions.length}/{totalFunctions}
-                            </span>
-                            {/* ✅ THÊM: Show count from roles */}
-                            {roleFunctionIds.length > 0 && (
-                                <span className="role-count">
-                                    Từ vai trò: {roleFunctionIds.length}
+                        <div className="header-actions">
+                            <div className="header-counts">
+                                <span className="selected-count">
+                                    Đã chọn: {selectedFunctions.length}/{totalFunctions}
                                 </span>
-                            )}
+                                {roleFunctionIds.length > 0 && (
+                                    <span className="role-count">
+                                        Từ vai trò: {roleFunctionIds.length}
+                                    </span>
+                                )}
+                            </div>
+                            <button
+                                type="button"
+                                className="btn-delete-all"
+                                onClick={handleDeleteAll}
+                                disabled={deleteAllMutation.isLoading || selectedFunctions.length === 0}
+                                title="Xóa toàn bộ chức năng riêng"
+                            >
+                                <Trash2 size={16} />
+                                Xóa toàn bộ
+                            </button>
                         </div>
                     </div>
 
@@ -349,7 +381,7 @@ export default function AssignFunctions() {
                                 node={node}
                                 selectedIds={selectedFunctions}
                                 onToggle={handleToggleFunction}
-                                roleFunctionIds={roleFunctionIds} // ✅ Pass role function IDs
+                                roleFunctionIds={roleFunctionIds}
                                 level={0}
                             />
                         ))}

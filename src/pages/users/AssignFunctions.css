@@ -40,3 +40,63 @@
     padding: 6px 12px;
     border-radius: 12px;
 }
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.header-counts {
+    display: flex;
+    gap: 12px;
+}
+
+.btn-delete-all {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background-color: transparent;
+    border: 1px solid #ef4444;
+    border-radius: 8px;
+    color: #ef4444;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.btn-delete-all:hover:not(:disabled) {
+    background-color: #ef4444;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+}
+
+.btn-delete-all:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: #cbd5e1;
+    color: #94a3b8;
+}
+
+@media (max-width: 768px) {
+    .assign-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .header-actions {
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .btn-delete-all {
+        width: 100%;
+        justify-content: center;
+    }
+}

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { roleApi } from '../../api/roles';
 import { functionApi } from '../../api/functions';
-import { ArrowLeft, Save, FileCode, ChevronRight, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Save, FileCode, ChevronRight, ChevronDown, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import './AssignFunctions.css';
 
@@ -80,8 +80,9 @@ function FunctionTreeNode({ node, selectedIds, onToggle, level = 0 }) {
 export default function AssignFunctions() {
     const { roleId } = useParams();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [selectedFunctions, setSelectedFunctions] = useState([]);
-    const [functionMap, setFunctionMap] = useState({}); // Map để tra cứu nhanh
+    const [functionMap, setFunctionMap] = useState({});
 
     // Get role info
     const { data: role, isLoading: roleLoading } = useQuery({
@@ -143,7 +144,7 @@ export default function AssignFunctions() {
         }
     }, [currentFunctions]);
 
-    // ✅ Get all parent IDs of a function
+    // Get all parent IDs of a function
     const getAllParentIds = (functionId) => {
         const parents = [];
         let currentId = functionId;
@@ -161,7 +162,7 @@ export default function AssignFunctions() {
         return parents;
     };
 
-    // ✅ Get all children IDs of a function (recursive)
+    // Get all children IDs of a function (recursive)
     const getAllChildrenIds = (functionId, allFuncs) => {
         const children = [];
 
@@ -190,6 +191,7 @@ export default function AssignFunctions() {
         mutationFn: (functionIds) =>
             roleApi.updateFunctions(parseInt(roleId), functionIds),
         onSuccess: () => {
+            queryClient.invalidateQueries(['role-functions', roleId]);
             toast.success('Cập nhật chức năng thành công');
             navigate('/roles');
         },
@@ -198,23 +200,33 @@ export default function AssignFunctions() {
         },
     });
 
-    // ✅ Handle toggle with auto-select parent
+    // Delete all functions mutation
+    const deleteAllMutation = useMutation({
+        mutationFn: () => roleApi.deleteFunctions(parseInt(roleId)),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['role-functions', roleId]);
+            setSelectedFunctions([]);
+            toast.success('Xóa toàn bộ chức năng của vai trò thành công');
+            // navigate('/roles');
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.message || 'Xóa chức năng thất bại');
+        },
+    });
+
+    // Handle toggle with auto-select parent
     const handleToggleFunction = (functionId, parentId) => {
         setSelectedFunctions((prev) => {
             const isCurrentlySelected = prev.includes(functionId);
 
             if (isCurrentlySelected) {
-                // ❌ UNCHECK: Remove function + all its children
                 const childrenIds = getAllChildrenIds(functionId, allFunctions);
                 return prev.filter(
                     (id) => id !== functionId && !childrenIds.includes(id)
                 );
             } else {
-                // ✅ CHECK: Add function + all its parents
                 const parentIds = getAllParentIds(functionId);
                 const newIds = [functionId, ...parentIds];
-
-                // Remove duplicates
                 const uniqueIds = [...new Set([...prev, ...newIds])];
                 return uniqueIds;
             }
@@ -232,7 +244,20 @@ export default function AssignFunctions() {
         updateMutation.mutate(selectedFunctions);
     };
 
-    // Count total functions
+    // Handle delete all with confirmation
+    const handleDeleteAll = () => {
+        if (selectedFunctions.length === 0) {
+            toast.error('Vai trò chưa có chức năng nào');
+            return;
+        }
+
+        if (window.confirm(
+            `Bạn có chắc muốn xóa TOÀN BỘ chức năng của vai trò "${role?.name}"?`
+        )) {
+            deleteAllMutation.mutate();
+        }
+    };
+
     const totalFunctions = Object.keys(functionMap).length;
 
     if (roleLoading || functionsLoading) {
@@ -264,9 +289,21 @@ export default function AssignFunctions() {
                             <FileCode size={20} />
                             <span>Chọn chức năng cho vai trò</span>
                         </div>
-                        <span className="selected-count">
-                            Đã chọn: {selectedFunctions.length}/{totalFunctions}
-                        </span>
+                        <div className="header-actions">
+                            <span className="selected-count">
+                                Đã chọn: {selectedFunctions.length}/{totalFunctions}
+                            </span>
+                            <button
+                                type="button"
+                                className="btn-delete-all"
+                                onClick={handleDeleteAll}
+                                disabled={deleteAllMutation.isLoading || selectedFunctions.length === 0}
+                                title="Xóa toàn bộ chức năng của vai trò"
+                            >
+                                <Trash2 size={16} />
+                                Xóa toàn bộ
+                            </button>
+                        </div>
                     </div>
 
                     <div className="functions-tree">
