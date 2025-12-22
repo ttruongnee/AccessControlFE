@@ -336,13 +336,14 @@ export default function UserList() {
                     </div>
 
                     <div className="form-group">
-                        <label>Password mới (để trống nếu không đổi)</label>
+                        <label>Password mới *</label>
                         <input
                             type="password"
                             value={formData.password}
                             onChange={(e) =>
                                 setFormData({ ...formData, password: e.target.value })
                             }
+                            required
                             placeholder="Nhập password mới"
                         />
                     </div>
@@ -351,6 +352,7 @@ export default function UserList() {
                         <label>Xác nhận Password mới</label>
                         <input
                             type="password"
+                            required
                             value={formData.confirmPassword}
                             onChange={(e) =>
                                 setFormData({ ...formData, confirmPassword: e.target.value })

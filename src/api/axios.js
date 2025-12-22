@@ -1,6 +1,5 @@
 import axios from 'axios';
 
-// ✅ SỬA: API URL mới
 const API_BASE_URL = 'https://localhost:7202/api';
 
 const axiosInstance = axios.create({
@@ -8,7 +7,7 @@ const axiosInstance = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    withCredentials: true, // ✅ THÊM: Để gửi cookie
+    withCredentials: true,
 });
 
 // Request interceptor - Thêm access token
@@ -29,29 +28,49 @@ axiosInstance.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
+        // ✅ Chỉ retry 1 lần
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
 
             try {
-                // ✅ SỬA: Refresh token từ cookie (không cần gửi body)
+                console.log('🔄 Access token hết hạn, đang refresh...');
+
+                // ✅ Call refresh token API
                 const response = await axios.post(
                     `${API_BASE_URL}/auth/refresh`,
                     {},
-                    { withCredentials: true } // ✅ QUAN TRỌNG: Gửi cookie
+                    { withCredentials: true }
                 );
 
-                const { accessToken } = response.data;
+                console.log('✅ Refresh token response:', response.data);
 
-                // Lưu access token mới
-                localStorage.setItem('accessToken', accessToken);
+                // ✅ QUAN TRỌNG: Lấy accessToken từ response
+                const newAccessToken = response.data.accessToken;
 
-                // Retry request với token mới
-                originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+                if (!newAccessToken) {
+                    throw new Error('Access token không có trong response');
+                }
+
+                // ✅ Lưu access token mới
+                localStorage.setItem('accessToken', newAccessToken);
+                console.log('✅ Đã lưu access token mới');
+
+                // ✅ Update header của request gốc
+                originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+
+                // ✅ Retry request gốc
+                console.log('🔄 Retry request gốc với token mới...');
                 return axiosInstance(originalRequest);
+
             } catch (refreshError) {
-                // Refresh token failed → Logout
+                console.error('❌ Refresh token thất bại:', refreshError);
+
+                // ✅ Clear localStorage
                 localStorage.removeItem('accessToken');
+
+                // ✅ Redirect to login
                 window.location.href = '/login';
+
                 return Promise.reject(refreshError);
             }
         }

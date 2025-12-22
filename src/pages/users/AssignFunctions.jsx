@@ -47,7 +47,7 @@ function FunctionTreeNode({
                     <input
                         type="checkbox"
                         checked={isSelected || isFromRole}
-                        onChange={() => !isFromRole && onToggle(node.id, node.parent_id)}
+                        onChange={() => !isFromRole && onToggle(node.id)}
                         disabled={isFromRole}
                     />
                 </div>
@@ -98,6 +98,7 @@ export default function AssignFunctions() {
     const queryClient = useQueryClient();
     const [selectedFunctions, setSelectedFunctions] = useState([]);
     const [functionMap, setFunctionMap] = useState({});
+    const [childrenMap, setChildrenMap] = useState({}); // ✅ THÊM: Map children
     const [roleFunctionIds, setRoleFunctionIds] = useState([]);
 
     // Get user info
@@ -150,7 +151,7 @@ export default function AssignFunctions() {
         }
     }, [userRoles]);
 
-    // Build function map for quick lookup
+    // ✅ Build function map AND children map
     useEffect(() => {
         const buildMap = (nodes, map = {}) => {
             nodes.forEach((node) => {
@@ -158,6 +159,7 @@ export default function AssignFunctions() {
                     id: node.id,
                     parent_id: node.parent_id,
                     name: node.name,
+                    children: node.children || []
                 };
                 if (node.children && node.children.length > 0) {
                     buildMap(node.children, map);
@@ -166,9 +168,22 @@ export default function AssignFunctions() {
             return map;
         };
 
+        // ✅ Build children map: parentId -> [childId1, childId2, ...]
+        const buildChildrenMap = (nodes, map = {}) => {
+            nodes.forEach((node) => {
+                if (node.children && node.children.length > 0) {
+                    map[node.id] = node.children.map(child => child.id);
+                    buildChildrenMap(node.children, map);
+                }
+            });
+            return map;
+        };
+
         if (allFunctions.length > 0) {
             const map = buildMap(allFunctions);
+            const childMap = buildChildrenMap(allFunctions);
             setFunctionMap(map);
+            setChildrenMap(childMap);
         }
     }, [allFunctions]);
 
@@ -191,7 +206,7 @@ export default function AssignFunctions() {
         }
     }, [currentFunctions]);
 
-    // Get all parent IDs of a function
+    // ✅ Get all parent IDs of a function
     const getAllParentIds = (functionId) => {
         const parents = [];
         let currentId = functionId;
@@ -209,28 +224,29 @@ export default function AssignFunctions() {
         return parents;
     };
 
-    // Get all children IDs of a function (recursive)
-    const getAllChildrenIds = (functionId, allFuncs) => {
+    // ✅ Get ALL children IDs recursively
+    const getAllChildrenIds = (functionId) => {
         const children = [];
 
-        const findChildren = (nodes) => {
-            nodes.forEach((node) => {
-                if (node.parent_id === functionId) {
-                    children.push(node.id);
-                    if (node.children && node.children.length > 0) {
-                        node.children.forEach(child => {
-                            children.push(child.id);
-                            findChildren([child]);
-                        });
-                    }
-                } else if (node.children && node.children.length > 0) {
-                    findChildren(node.children);
-                }
-            });
+        const collectChildren = (id) => {
+            if (childrenMap[id]) {
+                childrenMap[id].forEach(childId => {
+                    children.push(childId);
+                    collectChildren(childId); // Recursive
+                });
+            }
         };
 
-        findChildren(allFuncs);
+        collectChildren(functionId);
         return children;
+    };
+
+    // ✅ Check if all children are selected
+    const areAllChildrenSelected = (functionId, selected) => {
+        if (!childrenMap[functionId]) return true; // No children
+
+        const allChildren = getAllChildrenIds(functionId);
+        return allChildren.every(childId => selected.includes(childId));
     };
 
     // Update functions mutation
@@ -254,28 +270,85 @@ export default function AssignFunctions() {
             queryClient.invalidateQueries(['user-functions', userId]);
             setSelectedFunctions([]);
             toast.success('Xóa toàn bộ chức năng riêng thành công');
-            // navigate('/users');
         },
         onError: (error) => {
             toast.error(error.response?.data?.message || 'Xóa chức năng thất bại');
         },
     });
 
-    // Handle toggle with auto-select parent
-    const handleToggleFunction = (functionId, parentId) => {
+    // ✅ NEW: Handle toggle with new logic
+    const handleToggleFunction = (functionId) => {
         setSelectedFunctions((prev) => {
             const isCurrentlySelected = prev.includes(functionId);
+            const func = functionMap[functionId];
 
             if (isCurrentlySelected) {
-                const childrenIds = getAllChildrenIds(functionId, allFunctions);
-                return prev.filter(
+                // ❌ UNCHECK
+                const childrenIds = getAllChildrenIds(functionId);
+                let newSelected = prev.filter(
                     (id) => id !== functionId && !childrenIds.includes(id)
                 );
+
+                // ✅ Check nếu bỏ chọn hết tất cả con → Bỏ chọn cha
+                if (func.parent_id) {
+                    const parent = functionMap[func.parent_id];
+                    if (parent && childrenMap[func.parent_id]) {
+                        const allSiblings = childrenMap[func.parent_id];
+                        const hasAnySelectedSibling = allSiblings.some(siblingId =>
+                            newSelected.includes(siblingId)
+                        );
+
+                        // Nếu không còn con nào được chọn → Bỏ chọn cha
+                        if (!hasAnySelectedSibling) {
+                            newSelected = newSelected.filter(id => id !== func.parent_id);
+
+                            // Đệ quy lên trên (nếu cha cũng có cha)
+                            let currentParentId = parent.parent_id;
+                            while (currentParentId && functionMap[currentParentId]) {
+                                const currentParent = functionMap[currentParentId];
+                                if (childrenMap[currentParentId]) {
+                                    const siblings = childrenMap[currentParentId];
+                                    const hasSelected = siblings.some(id => newSelected.includes(id));
+                                    if (!hasSelected) {
+                                        newSelected = newSelected.filter(id => id !== currentParentId);
+                                        currentParentId = currentParent.parent_id;
+                                    } else {
+                                        break;
+                                    }
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return newSelected;
+
             } else {
+                // ✅ CHECK
+                let newSelected = [...prev];
+
+                // 1. Thêm function đang chọn
+                newSelected.push(functionId);
+
+                // 2. Tự động chọn TẤT CẢ parents
                 const parentIds = getAllParentIds(functionId);
-                const newIds = [functionId, ...parentIds];
-                const uniqueIds = [...new Set([...prev, ...newIds])];
-                return uniqueIds;
+                parentIds.forEach(parentId => {
+                    if (!newSelected.includes(parentId)) {
+                        newSelected.push(parentId);
+                    }
+                });
+
+                // 3. Tự động chọn TẤT CẢ children (nếu có)
+                const childrenIds = getAllChildrenIds(functionId);
+                childrenIds.forEach(childId => {
+                    if (!newSelected.includes(childId)) {
+                        newSelected.push(childId);
+                    }
+                });
+
+                return [...new Set(newSelected)]; // Remove duplicates
             }
         });
     };
@@ -285,12 +358,6 @@ export default function AssignFunctions() {
 
         if (selectedFunctions.length === 0) {
             toast.error('Vui lòng chọn ít nhất 1 chức năng');
-            return;
-        }
-
-        const duplicates = selectedFunctions.filter(id => roleFunctionIds.includes(id));
-        if (duplicates.length > 0) {
-            toast.error(`Các chức năng sau đã có trong vai trò: ${duplicates.join(', ')}`);
             return;
         }
 
@@ -332,7 +399,10 @@ export default function AssignFunctions() {
                         * Đây là quyền bổ sung ngoài các quyền từ vai trò
                     </p>
                     <p className="help-text">
-                        * Chọn chức năng con sẽ tự động chọn chức năng cha
+                        * Chọn chức năng cha sẽ tự động chọn TẤT CẢ con
+                    </p>
+                    <p className="help-text">
+                        * Bỏ chọn hết con sẽ tự động bỏ chọn cha
                     </p>
                     {roleFunctionIds.length > 0 && (
                         <p className="help-text warning">
